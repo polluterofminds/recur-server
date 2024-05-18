@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.2",
-    "@tsndr/cloudflare-worker-jwt": "^2.5.3"
+    "@tsndr/cloudflare-worker-jwt": "^2.5.3",
+    "@tsndr/cloudflare-worker-router": "^3.2.4"
   }
 }
