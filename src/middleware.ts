@@ -22,3 +22,36 @@ export const verifyToken = async (request: any, env: any) => {
     return { valid: false, error: err };
   }
 }
+
+export const logData = async (data: string, env: any) => {
+  try {
+    await fetch("https://api.exceptionless.com/api/v2/events", {
+      method: "POST", 
+      headers: {
+        'Authorization': `Bearer ${env.EXCEPTIONLESS_KEY}`, 
+        'Content-Type': 'application/json'
+      }, 
+      body: JSON.stringify({ "type": "log", "message": data, "date": new Date() })
+    })
+  } catch (error) {
+    console.log(error)
+    throw error;
+  }
+}
+
+export const logError = async (error: any, env: any) => {
+  try {
+    const errorData = { "type": "error", "date": new Date(), "@simple_error": error }
+    await fetch("https://api.exceptionless.com/api/v2/events", {
+      method: "POST", 
+      headers: {
+        'Authorization': `Bearer ${env.EXCEPTIONLESS_KEY}`, 
+        'Content-Type': 'application/json'
+      }, 
+      body: JSON.stringify(errorData)
+    })
+  } catch (error) {
+    console.log(error)
+    throw error;
+  }
+}

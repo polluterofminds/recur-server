@@ -1,5 +1,5 @@
 import { Router } from '@tsndr/cloudflare-worker-router'
-import { verifyToken } from './middleware';
+import { logData, logError, verifyToken } from './middleware';
 import { cancelScheduledTasks, cancelScheduledTasksByAccountId, getTaskByNewItemId, getUserData, upsertTasks, upsertUser } from './db';
 import { MutationBody, User, UserForDb } from './types';
 
@@ -36,6 +36,8 @@ router.get('/api/oauth-callback', async ({ req, env }) => {
 	let authCode = searchParams.get('code')
 	const clientID = env.CLIENT_ID;
 	const clientSecret = env.CLIENT_SECRET;
+
+	await logData(JSON.stringify({ event: "OAuth install"}), env)
 	try {
 		const response = await fetch('https://auth.monday.com/oauth2/token', {
 			method: "POST",
@@ -127,6 +129,7 @@ router.get('/api/oauth-callback', async ({ req, env }) => {
 		);
 	} catch (error) {
 		console.log(error);
+		await logError(error, env);
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 });
@@ -138,7 +141,7 @@ router.post(`/api/users`, async ({ req, env }) => {
 			return new Response("Unauthorized", { status: 401, statusText: "Unauthorized" })
 		}
 		const body: any = await req.json()
-		console.log(body)
+		await logData(JSON.stringify({ event: "user added", user_id: body?.user?.id }), env)
 		const { user } = body;
 		if(!user) {
 			return new Response("User object is required", { status: 400, statusText: "Invalid request" })
@@ -153,6 +156,7 @@ router.post(`/api/users`, async ({ req, env }) => {
 		return new Response("User created!", { status: 200, statusText: "Ok" })
 	} catch (error) {
 		console.log(error);
+		await logError(error, env)
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 })
@@ -160,9 +164,11 @@ router.post(`/api/users`, async ({ req, env }) => {
 // GET item
 router.get('/api/users/:id', async ({ req, env }) => {
 	try {
+		await logData(JSON.stringify({ event: "Get user", user_id: req.params.id}), env)
 		//	Validate Monday JWT
 		const tokenStatus = await verifyToken(req, env)
 		if (!tokenStatus.valid) {
+			await logError(new Error("Unauthorized"), env)
 			return new Response("Unauthorized", { status: 401, statusText: "Unauthorized" })
 		}
 		//	Look up user in DB and see if OAuth is connected
@@ -170,6 +176,7 @@ router.get('/api/users/:id', async ({ req, env }) => {
 		return Response.json(user)
 	} catch (error) {
 		console.log(error);
+		await logError(error, env)
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 });
@@ -178,11 +185,14 @@ router.post('/api/tasks', async ({ req, env }) => {
 	try {
 		const tokenStatus = await verifyToken(req, env)
 		if (!tokenStatus.valid) {
+			await logError(new Error("Unauthorized"), env)
 			return new Response("Unauthorized", { status: 401, statusText: "Unauthorized" })
-		}
+		}		
 
 		const userId = tokenStatus?.decoded?.dat.user_id;
 		const accountId = tokenStatus?.decoded?.dat.account_id;
+
+		await logData(JSON.stringify({ event: "add scheduled tasks",  user: userId, account: accountId }), env)
 
 		const body: MutationBody = await req.json();
 		const { mutations } = body;
@@ -200,6 +210,7 @@ router.post('/api/tasks', async ({ req, env }) => {
 		return new Response("Success", { status: 200, statusText: "Ok" })
 	} catch (error) {
 		console.log(error);
+		await logError(error, env)
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 })
@@ -208,18 +219,23 @@ router.get('/api/tasks/:new_item_id', async({ req, env }) => {
 	try {
 		const tokenStatus = await verifyToken(req, env)
 		if (!tokenStatus.valid) {
+			await logError(new Error("Unauthorized"), env)
 			return new Response("Unauthorized", { status: 401, statusText: "Unauthorized" })
 		}
 
 		const id = req.params.new_item_id;
 
+		await logData(JSON.stringify({ event: "Get task details",  task: id }), env)
+
 		if(!id) {
+			await logError(new Error("Item id is required"), env)
 			return new Response("Item id is required", { status: 400, statusText: "No item id provided" })
 		}
 		const task = await getTaskByNewItemId(parseInt(id, 10), env);
 		return Response.json(task)
 	} catch (error) {
 		console.log(error);
+		await logError(error, env)
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 })
@@ -228,18 +244,23 @@ router.delete('/api/tasks/:new_item_id', async({ req, env }) => {
 	try {
 		const tokenStatus = await verifyToken(req, env)
 		if (!tokenStatus.valid) {
+			await logError(new Error("Unauthorized"), env)
 			return new Response("Unauthorized", { status: 401, statusText: "Unauthorized" })
 		}
 
 		const id = req.params.new_item_id;
 
+		await logData(JSON.stringify({ event: "Delete tasks", taskId: id}), env)
+
 		if(!id) {
+			await logError(new Error("Item id is required"), env)
 			return new Response("Item id is required", { status: 400, statusText: "No item id provided" })
 		}
 		await cancelScheduledTasks(parseInt(id, 10), env);
 		return new Response("Success", { status: 200, statusText: "OK" })
 	} catch (error) {
 		console.log(error);
+		await logError(error, env)
 		return new Response("Server error", { status: 500, statusText: "Server error" })
 	}
 })
