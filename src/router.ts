@@ -1,10 +1,34 @@
 import { Router } from '@tsndr/cloudflare-worker-router'
 import { verifyToken } from './middleware';
-import { cancelScheduledTasks, getTaskByNewItemId, getUserData, upsertTasks, upsertUser } from './db';
+import { cancelScheduledTasks, cancelScheduledTasksByAccountId, getTaskByNewItemId, getUserData, upsertTasks, upsertUser } from './db';
 import { MutationBody, User, UserForDb } from './types';
 
 const router = new Router()
 router.cors();
+
+router.post('/api/webhook', async ({ req, env }) => {
+	try {
+		const event: any = await req.json()
+		console.log(event)
+		if(event.type === "uninstall") {
+			const accountId = event.data.account_id
+			const userId = event.data.user_id
+			//	Wipe the user data
+			await upsertUser({
+				monday_user_id: userId, 
+				email: "", 
+				access_token: "", 
+				name: ""
+			}, env)
+			//	Remove tasks
+			await cancelScheduledTasksByAccountId(parseInt(accountId, 10), env);
+		}
+		return new Response("Data removed!", { status: 200, statusText: "Ok" })
+	} catch (error) {
+		console.log(error);
+		return new Response("Server error", { status: 500, statusText: "Server error" })
+	}
+})
 
 // GET collection index
 router.get('/api/oauth-callback', async ({ req, env }) => {

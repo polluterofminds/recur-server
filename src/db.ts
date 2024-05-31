@@ -117,3 +117,17 @@ export const cancelScheduledTasks = async (id: number, env: any) => {
     throw error;
   }
 }
+
+export const cancelScheduledTasksByAccountId = async (id: number, env: any) => {
+  const supabaseKey = env.SUPABASE_KEY
+  const supabaseUrl = env.SUPABASE_URL
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('account_id', id)
+    .eq('executed', false)
+  if (error) {
+    throw error;
+  }
+}
